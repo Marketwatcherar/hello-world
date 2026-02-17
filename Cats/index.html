@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Education Data Entry Prototype</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; background:#f4f6f8; color:#1f2937; }
+    header { background:#0f172a; color:#fff; padding:12px 16px; }
+    .topbar { display:flex; gap:8px; padding:10px; flex-wrap:wrap; background:#fff; border-bottom:1px solid #ddd; }
+    select, input, textarea, button { padding:8px; border:1px solid #ccc; border-radius:8px; }
+    .tabs { display:flex; gap:8px; padding:10px; flex-wrap:wrap; }
+    .tab { background:#e5e7eb; border:none; cursor:pointer; }
+    .tab.active { background:#2563eb; color:#fff; }
+    .panel { display:none; padding:14px; }
+    .panel.active { display:block; }
+    .card { background:#fff; border-radius:12px; padding:12px; box-shadow:0 1px 2px rgba(0,0,0,.08); margin-bottom:10px; }
+    .row { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:8px; margin-bottom:8px; }
+    .roster-row { display:grid; grid-template-columns:2fr 1.5fr 1fr 1fr; gap:8px; margin-bottom:8px; align-items:center; }
+    .actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+    .badge { display:inline-block; padding:4px 8px; border-radius:99px; background:#e2e8f0; font-size:12px; }
+    @media (max-width: 800px){ .row,.roster-row{ grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+<header>
+  <h2 style="margin:0">Education Data Entry Prototype (Web/Mobile)</h2>
+</header>
+
+<div class="topbar">
+  <select id="schoolYear"><option>2026-2027</option></select>
+  <select id="classSel"><option>Grade 7 - A</option><option>Grade 7 - B</option></select>
+  <select id="subjectSel"><option>Math</option><option>English</option><option>Science</option></select>
+  <input id="dateSel" type="date" />
+  <span class="badge" id="onlineBadge">Online</span>
+</div>
+
+<div class="tabs">
+  <button class="tab active" data-panel="attendance">Attendance</button>
+  <button class="tab" data-panel="grades">Grades</button>
+  <button class="tab" data-panel="behavior">Behavior</button>
+  <button class="tab" data-panel="family">Family Feedback</button>
+  <button class="tab" data-panel="sync">Sync Status</button>
+</div>
+
+<section id="attendance" class="panel active">
+  <div class="card">
+    <h3>Attendance Roster</h3>
+    <div id="attendanceRoster"></div>
+    <div class="actions">
+      <button onclick="markAllPresent()">Mark all Present</button>
+      <button onclick="saveAttendanceDraft()">Save Draft (offline)</button>
+      <button onclick="submitAttendance()">Submit & Sync</button>
+    </div>
+  </div>
+</section>
+
+<section id="grades" class="panel">
+  <div class="card">
+    <h3>Grades</h3>
+    <div class="row">
+      <input id="assessmentTitle" placeholder="Assessment title" />
+      <select id="assessmentType"><option>exam</option><option>quiz</option><option>homework</option><option>project</option></select>
+      <input id="maxScore" type="number" placeholder="Max score" value="20" />
+      <button onclick="loadGradeRows()">Load Students</button>
+    </div>
+    <div id="gradeGrid"></div>
+    <div class="actions"><button onclick="saveGrades()">Save Grades</button></div>
+  </div>
+</section>
+
+<section id="behavior" class="panel">
+  <div class="card">
+    <h3>Behavior Record</h3>
+    <div class="row">
+      <select id="behaviorStudent"></select>
+      <input id="participation" type="number" min="1" max="5" placeholder="Participation 1-5" />
+      <input id="attitude" type="number" min="1" max="5" placeholder="Attitude 1-5" />
+      <input id="punctuality" type="number" min="1" max="5" placeholder="Punctuality 1-5" />
+    </div>
+    <div class="row">
+      <select id="severity"><option>none</option><option>minor</option><option>moderate</option><option>major</option></select>
+      <input id="context" placeholder="Incident context" />
+      <input id="followup" placeholder="Follow-up action" />
+      <button onclick="saveBehavior()">Save Behavior</button>
+    </div>
+  </div>
+</section>
+
+<section id="family" class="panel">
+  <div class="card">
+    <h3>Family Feedback</h3>
+    <div class="row">
+      <select id="familyStudent"></select>
+      <input id="engagement" type="number" min="1" max="5" placeholder="Engagement 1-5" />
+      <input id="satisfaction" type="number" min="1" max="5" placeholder="Satisfaction 1-5" />
+      <input id="communication" type="number" min="1" max="5" placeholder="Communication 1-5" />
+    </div>
+    <textarea id="familyComment" rows="3" style="width:100%" placeholder="Open comment"></textarea>
+    <div class="actions"><button onclick="saveFamily()">Save Feedback</button></div>
+  </div>
+</section>
+
+<section id="sync" class="panel">
+  <div class="card">
+    <h3>Sync Status</h3>
+    <p>Pending queue: <strong id="queueCount">0</strong></p>
+    <p>Last sync: <strong id="lastSync">Never</strong></p>
+    <div class="actions">
+      <button onclick="toggleOnline()">Toggle Online/Offline</button>
+      <button onclick="syncNow()">Sync now</button>
+      <button onclick="clearAllData()">Clear local data</button>
+    </div>
+  </div>
+</section>
+
+<script>
+const students = ["Amina Yusuf","David Stone","Lina Cruz","Musa Ali","Sara Khan"];
+const roster = document.getElementById('attendanceRoster');
+const dateSel = document.getElementById('dateSel');
+dateSel.valueAsDate = new Date();
+let online = true;
+
+function setupTabs(){
+  document.querySelectorAll('.tab').forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById(btn.dataset.panel).classList.add('active');
+    }
+  });
+}
+
+function uuid(){ return crypto.randomUUID ? crypto.randomUUID() : String(Date.now()+Math.random()); }
+function getQueue(){ return JSON.parse(localStorage.getItem('syncQueue') || '[]'); }
+function setQueue(q){ localStorage.setItem('syncQueue', JSON.stringify(q)); updateSyncUI(); }
+function enqueue(type, payload){ const q=getQueue(); q.push({id:uuid(), type, payload, createdAt:new Date().toISOString()}); setQueue(q); }
+
+function renderAttendance(){
+  roster.innerHTML = students.map(name => `
+    <div class="roster-row" data-name="${name}">
+      <strong>${name}</strong>
+      <select class="status"><option>present</option><option>absent</option><option>tardy</option></select>
+      <select class="absenceType"><option value="">absence type</option><option>excused</option><option>unexcused</option></select>
+      <input class="minutesLate" type="number" min="0" placeholder="minutes late" />
+    </div>`).join('');
+}
+
+function markAllPresent(){
+  document.querySelectorAll('.status').forEach(s => s.value='present');
+}
+
+function collectAttendance(){
+  const records=[];
+  let valid=true;
+  document.querySelectorAll('.roster-row').forEach(row=>{
+    const status=row.querySelector('.status').value;
+    const absenceType=row.querySelector('.absenceType').value;
+    const minutesLate=row.querySelector('.minutesLate').value;
+    if(status==='absent' && !absenceType) valid=false;
+    if(status==='tardy' && (minutesLate==='' || Number(minutesLate)<0)) valid=false;
+    records.push({
+      client_record_uuid: uuid(),
+      student_name: row.dataset.name,
+      attendance_date: dateSel.value,
+      status,
+      absence_type: status==='absent'?absenceType:null,
+      minutes_late: status==='tardy'?Number(minutesLate):null
+    });
+  });
+  return {valid, records};
+}
+
+function saveAttendanceDraft(){
+  const data=collectAttendance();
+  if(!data.valid){ alert('Please fill absence type/minutes late correctly.'); return; }
+  localStorage.setItem('attendanceDraft', JSON.stringify(data.records));
+  enqueue('attendance', data.records);
+  alert('Attendance draft saved locally.');
+}
+
+function submitAttendance(){
+  const data=collectAttendance();
+  if(!data.valid){ alert('Please fill absence type/minutes late correctly.'); return; }
+  if(!online){ enqueue('attendance', data.records); alert('Offline: queued for sync.'); return; }
+  localStorage.setItem('lastSync', new Date().toLocaleString());
+  alert('Attendance submitted (simulated).');
+  updateSyncUI();
+}
+
+function loadGradeRows(){
+  const max = Number(document.getElementById('maxScore').value||0);
+  const grid = document.getElementById('gradeGrid');
+  grid.innerHTML = students.map(s=>`<div class="roster-row"><strong>${s}</strong><input type="number" class="g" min="0" max="${max}" placeholder="score / ${max}"/><input class="c" placeholder="comment"/><span></span></div>`).join('');
+}
+
+function saveGrades(){
+  const max = Number(document.getElementById('maxScore').value||0);
+  const rows = [...document.querySelectorAll('#gradeGrid .roster-row')];
+  const payload = rows.map(r=>({client_record_uuid:uuid(),student_name:r.querySelector('strong').innerText,score:Number(r.querySelector('.g').value),comment:r.querySelector('.c').value}));
+  if(payload.some(p=>Number.isNaN(p.score) || p.score<0 || p.score>max)){ alert('Invalid score range.'); return; }
+  if(!online){ enqueue('grades', payload); alert('Grades queued (offline).'); return; }
+  localStorage.setItem('lastSync', new Date().toLocaleString());
+  alert('Grades saved (simulated).');
+  updateSyncUI();
+}
+
+function fillStudentSelectors(){
+  const opts = students.map(s=>`<option>${s}</option>`).join('');
+  document.getElementById('behaviorStudent').innerHTML = opts;
+  document.getElementById('familyStudent').innerHTML = opts;
+}
+
+function saveBehavior(){
+  const p = Number(document.getElementById('participation').value);
+  const a = Number(document.getElementById('attitude').value);
+  const pu = Number(document.getElementById('punctuality').value);
+  if([p,a,pu].some(v => v<1 || v>5 || Number.isNaN(v))){ alert('Ratings must be 1 to 5.'); return; }
+  const payload={client_record_uuid:uuid(),student:document.getElementById('behaviorStudent').value,participation:p,attitude:a,punctuality:pu,severity:document.getElementById('severity').value,context:document.getElementById('context').value,followup:document.getElementById('followup').value};
+  if(!online){ enqueue('behavior', payload); alert('Behavior queued (offline).'); return; }
+  localStorage.setItem('lastSync', new Date().toLocaleString());
+  alert('Behavior saved (simulated).');
+  updateSyncUI();
+}
+
+function saveFamily(){
+  const e = Number(document.getElementById('engagement').value);
+  const s = Number(document.getElementById('satisfaction').value);
+  const c = Number(document.getElementById('communication').value);
+  if([e,s,c].some(v => v<1 || v>5 || Number.isNaN(v))){ alert('Ratings must be 1 to 5.'); return; }
+  const payload={client_record_uuid:uuid(),student:document.getElementById('familyStudent').value,engagement:e,satisfaction:s,communication:c,comment:document.getElementById('familyComment').value};
+  if(!online){ enqueue('family_feedback', payload); alert('Feedback queued (offline).'); return; }
+  localStorage.setItem('lastSync', new Date().toLocaleString());
+  alert('Family feedback saved (simulated).');
+  updateSyncUI();
+}
+
+function toggleOnline(){
+  online=!online;
+  document.getElementById('onlineBadge').innerText = online ? 'Online' : 'Offline';
+  document.getElementById('onlineBadge').style.background = online ? '#dcfce7' : '#fee2e2';
+}
+
+function syncNow(){
+  if(!online){ alert('You are offline.'); return; }
+  const q=getQueue();
+  if(!q.length){ alert('Queue empty.'); return; }
+  setQueue([]);
+  localStorage.setItem('lastSync', new Date().toLocaleString());
+  alert('Queued items synced (simulated).');
+  updateSyncUI();
+}
+
+function clearAllData(){
+  localStorage.removeItem('syncQueue');
+  localStorage.removeItem('attendanceDraft');
+  localStorage.removeItem('lastSync');
+  updateSyncUI();
+  alert('Local demo data cleared.');
+}
+
+function updateSyncUI(){
+  document.getElementById('queueCount').innerText = getQueue().length;
+  document.getElementById('lastSync').innerText = localStorage.getItem('lastSync') || 'Never';
+}
+
+setupTabs();
+renderAttendance();
+fillStudentSelectors();
+updateSyncUI();
+loadGradeRows();
+</script>
+</body>
+</html>
