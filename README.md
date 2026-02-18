@@ -145,3 +145,50 @@ curl -I http://127.0.0.1:8095/Cats/
 ```
 
 If `curl` is 200 but Playwright still fails, it is usually a browser-container connectivity issue, not an app code issue.
+
+
+---
+
+## If GitHub says this branch has conflicts in `Cats/index.html` or `README.md`
+
+Use these exact commands locally:
+
+```zsh
+cd /workspace/hello-world
+git status
+```
+
+1. Update your branch with the latest target branch (example: `main`):
+
+```zsh
+git fetch origin
+git merge origin/main
+```
+
+2. If conflicts appear, open the files and remove conflict markers:
+- `<<<<<<<`
+- `=======`
+- `>>>>>>>`
+
+Keep the combined final content you want.
+
+3. Verify no conflict markers remain:
+
+```zsh
+rg "^(<<<<<<<|=======|>>>>>>>)" Cats/index.html README.md
+```
+
+4. Finalize resolution:
+
+```zsh
+git add Cats/index.html README.md
+git commit -m "Resolve merge conflicts in Cats/index.html and README.md"
+```
+
+5. Push your branch again:
+
+```zsh
+git push
+```
+
+If step 3 returns no output, conflicts are fully resolved.
