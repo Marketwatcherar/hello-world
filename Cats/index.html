@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EFL Student Data Entry Prototype</title>
+  <style>
+    :root {
+      --bg: #f3f6fb;
+      --card: #ffffff;
+      --ink: #1f2937;
+      --muted: #64748b;
+      --brand: #2563eb;
+      --ok: #16a34a;
+      --warn: #f59e0b;
+      --danger: #dc2626;
+      --radius: 14px;
+    }
+    * { box-sizing: border-box; }
+    body { font-family: Inter, Arial, sans-serif; margin: 0; background: var(--bg); color: var(--ink); }
+    header { background: linear-gradient(135deg, #0f172a, #1e293b); color: #fff; padding: 14px 18px; }
+    h1 { font-size: 1.25rem; margin: 0; }
+    .subtitle { margin-top: 6px; font-size: .92rem; color: #dbeafe; }
+
+    .shell { max-width: 1200px; margin: 0 auto; padding: 12px; }
+    .topbar {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(150px, 1fr));
+      gap: 10px;
+      background: #fff;
+      padding: 12px;
+      border-radius: var(--radius);
+      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.07);
+      margin-bottom: 10px;
+    }
+    .topbar > * { width: 100%; }
+
+    select, input, textarea, button {
+      min-height: 46px;
+      padding: 10px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      font-size: 16px;
+    }
+    select, input, textarea { background: #fff; }
+    button { cursor: pointer; background: #eef2ff; font-weight: 600; }
+    button.primary { background: var(--brand); color: white; border-color: var(--brand); }
+    button.success { background: var(--ok); color: white; border-color: var(--ok); }
+
+    .badge {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      border-radius: 999px;
+      border: 1px solid #cbd5e1;
+      background: #ecfeff;
+      min-height: 46px;
+    }
+
+    .helper {
+      background: #fffbeb;
+      border: 1px solid #fef08a;
+      color: #92400e;
+      padding: 10px;
+      border-radius: 10px;
+      margin-bottom: 10px;
+      font-size: .95rem;
+    }
+
+    .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+    .tab { border: none; background: #e2e8f0; }
+    .tab.active { background: var(--brand); color: #fff; }
+
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.07);
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+
+    .card h3 { margin-top: 0; margin-bottom: 8px; }
+    .row { display: grid; grid-template-columns: repeat(4, minmax(130px, 1fr)); gap: 8px; margin-bottom: 10px; }
+    .roster-row { display: grid; grid-template-columns: 1.6fr repeat(4, 1fr); gap: 8px; margin-bottom: 8px; align-items: center; }
+    .rubric-row { display: grid; grid-template-columns: 1.6fr repeat(4, 1fr) 1fr; gap: 8px; margin-bottom: 8px; align-items: center; }
+
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .tiny { font-size: .88rem; color: var(--muted); margin-top: 0; }
+    .pill { background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; border-radius: 999px; padding: 3px 8px; font-size: .8rem; }
+
+    .sticky-actions {
+      position: sticky;
+      bottom: 8px;
+      background: rgba(255,255,255,.95);
+      backdrop-filter: blur(4px);
+      border: 1px solid #e2e8f0;
+      padding: 10px;
+      border-radius: 12px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      z-index: 10;
+    }
+
+    @media (max-width: 980px) {
+      .topbar { grid-template-columns: 1fr 1fr; }
+      .row, .roster-row, .rubric-row { grid-template-columns: 1fr; }
+      .badge { justify-content: flex-start; padding-left: 12px; }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <h1>📘 EFL Data Entry Assistant</h1>
+  <div class="subtitle">Fast, teacher-friendly entry for attendance, behavior, and broader English rubrics.</div>
+</header>
+
+<div class="shell">
+  <div class="topbar">
+    <select id="schoolYear"><option>2026-2027</option></select>
+    <select id="classSel"><option>Grade 7 - A</option><option>Grade 7 - B</option></select>
+    <select id="subjectSel"><option>English</option><option>Math</option><option>Science</option></select>
+    <input id="dateSel" type="date" />
+    <div class="badge" id="onlineBadge">🟢 Online</div>
+  </div>
+
+  <div class="helper">
+    💡 <strong>Teacher speed tip:</strong> Filter student names, use bigger drop-downs, and save offline if the internet is unstable.
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-panel="attendance">Attendance</button>
+    <button class="tab" data-panel="grades">Grades & Rubrics</button>
+    <button class="tab" data-panel="behavior">Behavior</button>
+    <button class="tab" data-panel="family">Family Feedback</button>
+    <button class="tab" data-panel="sync">Sync Status</button>
+  </div>
+
+  <section id="attendance" class="panel active">
+    <div class="card">
+      <h3>Attendance Roster</h3>
+      <p class="tiny">Mark all present first, then only edit exceptions.</p>
+      <input id="attendanceFilter" placeholder="Search student..." oninput="renderAttendance()" />
+      <div id="attendanceRoster"></div>
+      <div class="sticky-actions">
+        <button onclick="markAllPresent()">Mark all Present</button>
+        <button onclick="saveAttendanceDraft()">Save Draft (offline)</button>
+        <button class="primary" onclick="submitAttendance()">Submit & Sync</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="grades" class="panel">
+    <div class="card">
+      <h3>English Assessment Setup</h3>
+      <div class="row">
+        <input id="assessmentTitle" placeholder="Assessment title" value="Mid-term speaking task" />
+        <select id="assessmentType"><option>oral</option><option>exam</option><option>quiz</option><option>homework</option><option>project</option></select>
+        <input id="maxScore" type="number" placeholder="Max score" value="20" />
+        <button onclick="loadGradeRows()">Load Students</button>
+      </div>
+      <div id="gradeGrid"></div>
+      <div class="actions"><button class="primary" onclick="saveGrades()">Save Numeric Grades</button></div>
+    </div>
+
+    <div class="card">
+      <h3>🗣️ Oral Production Rubric <span class="pill">EFL</span></h3>
+      <p class="tiny">Criteria: Fluency, Grammatical Precision, Pronunciation, Content & Coherence (1–5 each).</p>
+      <input id="oralFilter" placeholder="Search student..." oninput="renderRubrics()" />
+      <div id="oralRubricGrid"></div>
+      <div class="actions"><button class="success" onclick="saveOralRubrics()">Save Oral Rubrics</button></div>
+    </div>
+
+    <div class="card">
+      <h3>✍️ Written Production Rubric <span class="pill">EFL</span></h3>
+      <p class="tiny">Criteria: Task Achievement, Organization, Grammar Accuracy, Vocabulary Range (1–5 each).</p>
+      <div id="writtenRubricGrid"></div>
+      <div class="actions"><button class="success" onclick="saveWrittenRubrics()">Save Written Rubrics</button></div>
+    </div>
+  </section>
+
+  <section id="behavior" class="panel">
+    <div class="card">
+      <h3>Behavior Record</h3>
+      <p class="tiny">Use quick ratings to keep data entry under 30 seconds per student.</p>
+      <div class="row">
+        <select id="behaviorStudent"></select>
+        <input id="participation" type="number" min="1" max="5" placeholder="Participation 1-5" />
+        <input id="attitude" type="number" min="1" max="5" placeholder="Attitude 1-5" />
+        <input id="punctuality" type="number" min="1" max="5" placeholder="Punctuality 1-5" />
+      </div>
+      <div class="row">
+        <select id="severity"><option>none</option><option>minor</option><option>moderate</option><option>major</option></select>
+        <input id="context" placeholder="Incident context" />
+        <input id="followup" placeholder="Follow-up action" />
+        <button class="primary" onclick="saveBehavior()">Save Behavior</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="family" class="panel">
+    <div class="card">
+      <h3>Family Feedback</h3>
+      <div class="row">
+        <select id="familyStudent"></select>
+        <input id="engagement" type="number" min="1" max="5" placeholder="Engagement 1-5" />
+        <input id="satisfaction" type="number" min="1" max="5" placeholder="Satisfaction 1-5" />
+        <input id="communication" type="number" min="1" max="5" placeholder="Communication 1-5" />
+      </div>
+      <textarea id="familyComment" rows="3" style="width:100%" placeholder="Open comment"></textarea>
+      <div class="actions"><button class="primary" onclick="saveFamily()">Save Feedback</button></div>
+    </div>
+  </section>
+
+  <section id="sync" class="panel">
+    <div class="card">
+      <h3>Sync Status</h3>
+      <p>Pending queue: <strong id="queueCount">0</strong></p>
+      <p>Last sync: <strong id="lastSync">Never</strong></p>
+      <div class="actions">
+        <button onclick="toggleOnline()">Toggle Online/Offline</button>
+        <button onclick="syncNow()">Sync now</button>
+        <button onclick="clearAllData()">Clear local data</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+const students = ["Amina Yusuf","David Stone","Lina Cruz","Musa Ali","Sara Khan","Rosa Pérez","Yuki Tanaka"];
+const roster = document.getElementById('attendanceRoster');
+const dateSel = document.getElementById('dateSel');
+dateSel.valueAsDate = new Date();
+let online = true;
+
+const rubricOptions = [
+  '<option value="">-</option>',
+  '<option value="1">1 - Emerging</option>',
+  '<option value="2">2 - Developing</option>',
+  '<option value="3">3 - Competent</option>',
+  '<option value="4">4 - Strong</option>',
+  '<option value="5">5 - Excellent</option>'
+].join('');
+
+function setupTabs(){
+  document.querySelectorAll('.tab').forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById(btn.dataset.panel).classList.add('active');
+    }
+  });
+}
+
+function uuid(){ return crypto.randomUUID ? crypto.randomUUID() : String(Date.now()+Math.random()); }
+function getQueue(){ return JSON.parse(localStorage.getItem('syncQueue') || '[]'); }
+function setQueue(q){ localStorage.setItem('syncQueue', JSON.stringify(q)); updateSyncUI(); }
+function enqueue(type, payload){ const q=getQueue(); q.push({id:uuid(), type, payload, createdAt:new Date().toISOString()}); setQueue(q); }
+function filteredStudents(inputId){
+  const q = (document.getElementById(inputId)?.value || '').toLowerCase().trim();
+  return students.filter(s => s.toLowerCase().includes(q));
+}
+
+function renderAttendance(){
+  const list = filteredStudents('attendanceFilter');
+  roster.innerHTML = list.map(name => `
+    <div class="roster-row" data-name="${name}">
+      <strong>${name}</strong>
+      <select class="status"><option>present</option><option>absent</option><option>tardy</option></select>
+      <select class="absenceType"><option value="">absence type</option><option>excused</option><option>unexcused</option></select>
+      <input class="minutesLate" type="number" min="0" placeholder="minutes late" />
+      <span class="tiny">Quick entry</span>
+    </div>`).join('');
+}
+
+function markAllPresent(){
+  document.querySelectorAll('.status').forEach(s => s.value='present');
+}
+
+function collectAttendance(){
+  const records=[];
+  let valid=true;
+  document.querySelectorAll('#attendanceRoster .roster-row').forEach(row=>{
+    const status=row.querySelector('.status').value;
+    const absenceType=row.querySelector('.absenceType').value;
+    const minutesLate=row.querySelector('.minutesLate').value;
+    if(status==='absent' && !absenceType) valid=false;
+    if(status==='tardy' && (minutesLate==='' || Number(minutesLate)<0)) valid=false;
+    records.push({
+      client_record_uuid: uuid(),
+      student_name: row.dataset.name,
+      attendance_date: dateSel.value,
+      status,
+      absence_type: status==='absent'?absenceType:null,
+      minutes_late: status==='tardy'?Number(minutesLate):null
+    });
+  });
+  return {valid, records};
+}
+
+function saveAttendanceDraft(){
+  const data=collectAttendance();
+  if(!data.valid){ alert('Please fill absence type/minutes late correctly.'); return; }
+  localStorage.setItem('attendanceDraft', JSON.stringify(data.records));
+  enqueue('attendance', data.records);
+  alert('Attendance draft saved locally.');
+}
+
+function submitAttendance(){
+  const data=collectAttendance();
+  if(!data.valid){ alert('Please fill absence type/minutes late correctly.'); return; }
+  if(!online){ enqueue('attendance', data.records); alert('Offline: queued for sync.'); return; }
+  localStorage.setItem('lastSync', new Date().toLocaleString());
+  alert('Attendance submitted (simulated).');
+  updateSyncUI();
+}
+
+function loadGradeRows(){
+  const max = Number(document.getElementById('maxScore').value||0);
+  const grid = document.getElementById('gradeGrid');
+  grid.innerHTML = students.map(s=>`<div class="roster-row"><strong>${s}</strong><input type="number" class="g" min="0" max="${max}" placeholder="score / ${max}"/><input class="c" placeholder="comment"/><span class="tiny">Range 0-${max}</span><span></span></div>`).join('');
+}
+
+function saveGrades(){
+  const max = Number(document.getElementById('maxScore').value||0);
+  const rows = [...document.querySelectorAll('#gradeGrid .roster-row')];
+  const payload = rows.map(r=>({client_record_uuid:uuid(),student_name:r.querySelector('strong').innerText,score:Number(r.querySelector('.g').value),comment:r.querySelector('.c').value}));
+  if(payload.some(p=>Number.isNaN(p.score) || p.score<0 || p.score>max)){ alert('Invalid score range.'); return; }
+  if(!online){ enqueue('grades', payload); alert('Grades queued (offline).'); return; }
+  localStorage.setItem('lastSync', new Date().toLocaleString());
+  alert('Grades saved (simulated).');
+  updateSyncUI();
+}
+
+function rubricRow(name, type){
+  return `<div class="rubric-row" data-name="${name}" data-type="${type}">
+      <strong>${name}</strong>
+      <select class="r1">${rubricOptions}</select>
+      <select class="r2">${rubricOptions}</select>
+      <select class="r3">${rubricOptions}</select>
+      <select class="r4">${rubricOptions}</select>
+      <input class="rtotal" placeholder="Total" readonly />
+    </div>`;
+}
+
+function computeRubricTotals(){
+  document.querySelectorAll('.rubric-row').forEach(row => {
+    const vals = ['.r1','.r2','.r3','.r4'].map(c => Number(row.querySelector(c).value || 0));
+    const total = vals.reduce((a,b)=>a+b,0);
+    row.querySelector('.rtotal').value = total ? `${total}/20` : '';
+  });
+}
+
+function renderRubrics(){
+  const oralList = filteredStudents('oralFilter');
+  document.getElementById('oralRubricGrid').innerHTML = oralList.map(s => rubricRow(s,'oral')).join('');
+  document.getElementById('writtenRubricGrid').innerHTML = students.map(s => rubricRow(s,'written')).join('');
+  document.querySelectorAll('.rubric-row select').forEach(el => el.onchange = computeRubricTotals);
+}
+
+function collectRubrics(type){
+  const rows = [...document.querySelectorAll(`.rubric-row[data-type="${type}"]`)];
+  const payload = rows.map(r => ({
+    client_record_uuid: uuid(),
+    student_name: r.dataset.name,
+    c1: Number(r.querySelector('.r1').value||0),
+    c2: Number(r.querySelector('.r2').value||0),
+    c3: Number(r.querySelector('.r3').value||0),
+    c4: Number(r.querySelector('.r4').value||0)
+  }));
+  return payload.filter(p => p.c1+p.c2+p.c3+p.c4 > 0);
+}
+
+function saveOralRubrics(){
+  const payload = collectRubrics('oral').map(p => ({...p, rubric: {fluency:p.c1, grammatical_precision:p.c2, pronunciation:p.c3, content_coherence:p.c4}}));
+  if(!payload.length){ alert('No oral rubric entries to save yet.'); return; }
+  if(!online){ enqueue('oral_rubrics', payload); alert('Oral rubrics queued (offline).'); return; }
+  localStorage.setItem('lastSync', new Date().toLocaleString());
+  alert('Oral rubrics saved (simulated).');
+  updateSyncUI();
+}
+
+function saveWrittenRubrics(){
+  const payload = collectRubrics('written').map(p => ({...p, rubric: {task_achievement:p.c1, organization:p.c2, grammar_accuracy:p.c3, vocabulary_range:p.c4}}));
+  if(!payload.length){ alert('No written rubric entries to save yet.'); return; }
+  if(!online){ enqueue('written_rubrics', payload); alert('Written rubrics queued (offline).'); return; }
+  localStorage.setItem('lastSync', new Date().toLocaleString());
+  alert('Written rubrics saved (simulated).');
+  updateSyncUI();
+}
+
+function fillStudentSelectors(){
+  const opts = students.map(s=>`<option>${s}</option>`).join('');
+  document.getElementById('behaviorStudent').innerHTML = opts;
+  document.getElementById('familyStudent').innerHTML = opts;
+}
+
+function saveBehavior(){
+  const p = Number(document.getElementById('participation').value);
+  const a = Number(document.getElementById('attitude').value);
+  const pu = Number(document.getElementById('punctuality').value);
+  if([p,a,pu].some(v => v<1 || v>5 || Number.isNaN(v))){ alert('Ratings must be 1 to 5.'); return; }
+  const payload={client_record_uuid:uuid(),student:document.getElementById('behaviorStudent').value,participation:p,attitude:a,punctuality:pu,severity:document.getElementById('severity').value,context:document.getElementById('context').value,followup:document.getElementById('followup').value};
+  if(!online){ enqueue('behavior', payload); alert('Behavior queued (offline).'); return; }
+  localStorage.setItem('lastSync', new Date().toLocaleString());
+  alert('Behavior saved (simulated).');
+  updateSyncUI();
+}
+
+function saveFamily(){
+  const e = Number(document.getElementById('engagement').value);
+  const s = Number(document.getElementById('satisfaction').value);
+  const c = Number(document.getElementById('communication').value);
+  if([e,s,c].some(v => v<1 || v>5 || Number.isNaN(v))){ alert('Ratings must be 1 to 5.'); return; }
+  const payload={client_record_uuid:uuid(),student:document.getElementById('familyStudent').value,engagement:e,satisfaction:s,communication:c,comment:document.getElementById('familyComment').value};
+  if(!online){ enqueue('family_feedback', payload); alert('Feedback queued (offline).'); return; }
+  localStorage.setItem('lastSync', new Date().toLocaleString());
+  alert('Family feedback saved (simulated).');
+  updateSyncUI();
+}
+
+function toggleOnline(){
+  online=!online;
+  const badge = document.getElementById('onlineBadge');
+  badge.innerText = online ? '🟢 Online' : '🔴 Offline';
+  badge.style.background = online ? '#dcfce7' : '#fee2e2';
+  badge.style.borderColor = online ? '#bbf7d0' : '#fecaca';
+}
+
+function syncNow(){
+  if(!online){ alert('You are offline.'); return; }
+  const q=getQueue();
+  if(!q.length){ alert('Queue empty.'); return; }
+  setQueue([]);
+  localStorage.setItem('lastSync', new Date().toLocaleString());
+  alert('Queued items synced (simulated).');
+  updateSyncUI();
+}
+
+function clearAllData(){
+  localStorage.removeItem('syncQueue');
+  localStorage.removeItem('attendanceDraft');
+  localStorage.removeItem('lastSync');
+  updateSyncUI();
+  alert('Local demo data cleared.');
+}
+
+function updateSyncUI(){
+  document.getElementById('queueCount').innerText = getQueue().length;
+  document.getElementById('lastSync').innerText = localStorage.getItem('lastSync') || 'Never';
+}
+
+setupTabs();
+renderAttendance();
+fillStudentSelectors();
+updateSyncUI();
+loadGradeRows();
+renderRubrics();
+</script>
+</body>
+</html>
