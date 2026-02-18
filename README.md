@@ -192,3 +192,33 @@ git push
 ```
 
 If step 3 returns no output, conflicts are fully resolved.
+
+
+---
+
+## Conflict resolution outcome for `Cats/index.html` and `README.md`
+
+The merge conflicts you pasted are resolved by keeping the **EFL-enhanced version** and dropping only conflict markers.
+
+Chosen final baseline includes:
+- EFL UI title and expanded teacher-friendly layout.
+- Oral rubric criteria: fluency, grammatical precision, pronunciation, content/coherence.
+- Written rubric criteria: task achievement, organization, grammar accuracy, vocabulary range.
+- Larger controls and improved UX helpers.
+
+Validation command (must return no output):
+
+```zsh
+rg "^(<<<<<<<|=======|>>>>>>>)" Cats/index.html README.md
+```
+
+If you still see conflicts on GitHub after local resolution, run:
+
+```zsh
+git fetch origin
+git merge origin/main
+rg "^(<<<<<<<|=======|>>>>>>>)" Cats/index.html README.md
+git add Cats/index.html README.md
+git commit -m "Resolve merge conflicts in Cats/index.html and README.md"
+git push
+```
